@@ -7,6 +7,7 @@
 //
 
 #import "AppDelegate.h"
+#import "NXOAuth2.h"
 
 @interface AppDelegate ()
 
@@ -14,9 +15,18 @@
 
 @implementation AppDelegate
 
-
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     // Override point for customization after application launch.
+    return YES;
+}
+
+- (BOOL)application:(UIApplication *)application openURL:(NSURL *)url
+  sourceApplication:(NSString *)sourceApplication annotation:(id)annotation
+{
+    NSLog(@"Calling Application Bundle ID: %@", sourceApplication);
+    NSLog(@"URL scheme:%@", [url scheme]);
+    NSLog(@"URL query: %@", [url query]);
+    self.verifierCompletionBlock([url query]);
     return YES;
 }
 
