@@ -164,7 +164,17 @@
 
 - (void)imageDownloaderDidFinish:(ImageDownloader *)downloader {
     NSIndexPath *indexPath = downloader.indexPathInTableView;
-    [self.tableView reloadRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationFade];
+    //[self.tableView reloadRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationFade];
+    UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:indexPath];
+    if (downloader.photo.hasImage) {
+        [((UIActivityIndicatorView *)cell.accessoryView) stopAnimating];
+        cell.imageView.image = downloader.photo.image;
+        cell.textLabel.text = downloader.photo.title;
+    }else if (downloader.photo.isFailed) {
+        [((UIActivityIndicatorView *)cell.accessoryView) stopAnimating];
+        cell.imageView.image = [UIImage imageNamed:@"Failed.png"];
+        cell.textLabel.text = @"Failed to load";
+    }
     [self.downloadsInProgress removeObjectForKey:indexPath];
 }
 
