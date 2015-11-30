@@ -15,6 +15,8 @@
 
 @implementation FlickrInterestingPhotosRequest
 -(void)requestWithPageNumber:(NSNumber*)pageNumber withCompletionHandler:(void (^) (NSMutableArray *photos, NSError *error))completionBlock{
+    NSLog(@"AccessToken:%@",self.accessToken);
+    NSLog(@"AccessTokenSecret:%@",self.accessTokenSecret);
     NSDictionary *parameters = @{ @"oauth_consumer_key": self.oauthConsumerKey,
                                   @"oauth_nonce": self.oauthNonce,
                                   @"oauth_verifier":self.oauthVerifier,

@@ -24,6 +24,11 @@ NSString * const callbackURL = @"iosflickr://";
 
 NSString * const restURL = @"https://api.flickr.com/services/rest";
 
+NSString * const oauthAccessTokenKey = @"oauthAccessTokenKey";
+NSString * const oauthAccesTokenSecretKey = @"oauthAccessTokenSecretKey";
+NSString * const oauthVerifierKey = @"oauthVerifierKey";
+NSString * const oauthAccessTokenDateKey = @"oauthAccessTokenDateKey";
+
 
 @interface Flickr()
 @property (nonatomic, strong) NSString *oauthToken;
@@ -40,6 +45,10 @@ NSString * const restURL = @"https://api.flickr.com/services/rest";
 
 @implementation Flickr
 
+@synthesize oauthAccessToken = _oauthAccessToken;
+@synthesize oauthAccessTokenSecret = _oauthAccessTokenSecret;
+@synthesize verifier = _verifier;
+
 +(Flickr *)sharedFlickr{
     static Flickr *flickr = nil;
     static dispatch_once_t onceToken;
@@ -49,10 +58,56 @@ NSString * const restURL = @"https://api.flickr.com/services/rest";
     return flickr;
 }
 
+
+#pragma mark getters/setters
+-(void)setOauthAccessToken:(NSString *)oauthAccessToken{
+    NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
+    [userDefaults setObject:oauthAccessToken forKey:oauthAccessTokenKey];
+    [userDefaults synchronize];
+}
+
+-(NSString *)oauthAccessToken{
+    NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
+    _oauthAccessToken = [userDefaults objectForKey:oauthAccessTokenKey];
+    [userDefaults synchronize];
+    return _oauthAccessToken;
+}
+
+-(void)setOauthAccessTokenSecret:(NSString *)oauthAccessTokenSecret{
+    NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
+    [userDefaults setObject:oauthAccessTokenSecret forKey:oauthAccesTokenSecretKey];
+    [userDefaults synchronize];
+}
+
+-(NSString *)oauthAccessTokenSecret{
+    NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
+    _oauthAccessTokenSecret = [userDefaults objectForKey:oauthAccesTokenSecretKey];
+    [userDefaults synchronize];
+    return _oauthAccessTokenSecret;
+}
+
+-(void)setVerifier:(NSString *)verifier{
+    NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
+    [userDefaults setObject:_verifier forKey:oauthVerifierKey];
+    [userDefaults synchronize];
+}
+
+-(NSString *)verifier{
+    NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
+    _verifier = [userDefaults objectForKey:oauthVerifierKey];
+    [userDefaults synchronize];
+    return _verifier;
+}
+
 #pragma mark request token
 
 - (void)requestTokenWithCompletionHandler:(void(^)(NSString *authorizationURL,BOOL hasAccessToken, NSError *error))completionBlock
 {
+    if (self.oauthAccessToken){
+        completionBlock(nil, YES, nil);
+        return;
+    }
+    
     [self _generateNonce];
     [self _generateTimestamp];
     FlickrOAuthTokenRequest *tokenRequest = [[FlickrOAuthTokenRequest alloc] init];
@@ -101,7 +156,8 @@ NSString * const restURL = @"https://api.flickr.com/services/rest";
 
 #pragma mark Interesting Photos
 -(void)requestInterestingPhotosWithPageNumber:(NSNumber*)pageNumber CompletionHandler:(void(^)(NSMutableArray *photos, NSError *error))completionBlock {
-    
+    [self _generateNonce];
+    [self _generateTimestamp];
     FlickrInterestingPhotosRequest *interestingRequest = [[FlickrInterestingPhotosRequest alloc] init];
     interestingRequest.oauthConsumerKey = consumerKey;
     interestingRequest.oauthSecretKey = secretKey;
@@ -117,7 +173,8 @@ NSString * const restURL = @"https://api.flickr.com/services/rest";
 }
 
 -(void)requestInfoForPhoto:(NSString*)photoID secret:(NSString*)photoSecret completionHandler:(void (^)(BOOL isFavorite))completionBlock{
-    
+    [self _generateNonce];
+    [self _generateTimestamp];
     FlickrGetInfoForPhotoRequest *infoRequest = [[FlickrGetInfoForPhotoRequest alloc] init];
     infoRequest.oauthConsumerKey = consumerKey;
     infoRequest.oauthSecretKey = secretKey;
@@ -136,7 +193,8 @@ NSString * const restURL = @"https://api.flickr.com/services/rest";
 }
 
 -(void)requestToFavorite:(BOOL)favorite Photo:(NSString *)photoID completionHandler:(void (^)(BOOL ok))completionBlock{
-    
+    [self _generateNonce];
+    [self _generateTimestamp];
     FlickrFavoriteRequest *favoriteRequest = [[FlickrFavoriteRequest alloc] init];
     favoriteRequest.oauthConsumerKey = consumerKey;
     favoriteRequest.oauthSecretKey = secretKey;
