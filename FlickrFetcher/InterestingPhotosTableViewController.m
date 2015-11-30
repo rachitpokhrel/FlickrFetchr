@@ -8,7 +8,6 @@
 
 #import "InterestingPhotosTableViewController.h"
 #import "DetailPhotoViewController.h"
-#import "SVPullToRefresh.h"
 #import "MBProgressHUD.h"
 #import "Flickr.h"
 #import "Photo.h"
@@ -60,24 +59,32 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = @"Interesting Photos";
-    [self requestInterestingPhotos];
+    [self requestInterestingPhotos:self];
     self.refreshControl = [[UIRefreshControl alloc] init];
-    [self.refreshControl addTarget:self action:@selector(requestInterestingPhotos) forControlEvents:UIControlEventValueChanged];
+    [self.refreshControl addTarget:self action:@selector(requestInterestingPhotos:) forControlEvents:UIControlEventValueChanged];
 }
 
--(void)requestInterestingPhotos{
-    [self requestInterestingPhotosForPageNumber:self.pageNumber];
+-(void)requestInterestingPhotos:(id)sender{
+    if ([sender isKindOfClass:[UIRefreshControl class]]){
+        self.pageNumber = @1;
+        [self requestInterestingPhotosForPageNumber:self.pageNumber sender:sender];
+    }else
+        [self requestInterestingPhotosForPageNumber:self.pageNumber sender:sender];
 }
 
--(void)requestInterestingPhotosForPageNumber:(NSNumber*)pageNumber {
+-(void)requestInterestingPhotosForPageNumber:(NSNumber*)pageNumber sender:(id)sender{
     [MBProgressHUD showHUDAddedTo:self.view animated:YES];
     NSLog(@"pagenumber:%@",pageNumber);
     [[Flickr sharedFlickr] requestInterestingPhotosWithPageNumber:pageNumber CompletionHandler:^(NSMutableArray *photos, NSError *error) {
-        [self updatePhotos:photos];
+        [self updatePhotos:photos sender:sender];
     }];
 }
 
--(void)updatePhotos:(NSMutableArray*)photos{
+-(void)updatePhotos:(NSMutableArray*)photos sender:(id)sender{
+    if ([sender isKindOfClass:[UIRefreshControl class]]){
+        if (photos)
+            [self.photos removeAllObjects];
+    }
     [self.photos addObjectsFromArray:photos];
     NSLog(@"photos:%@",self.photos);
     [self reloadData];
@@ -196,7 +203,7 @@
 {
     NSUInteger _number = [self.pageNumber integerValue];_number++;
     self.pageNumber = [NSNumber numberWithInteger:_number];
-    [self requestInterestingPhotosForPageNumber:self.pageNumber];
+    [self requestInterestingPhotosForPageNumber:self.pageNumber sender:self];
     self.pagingRequestSent = YES;
 }
 

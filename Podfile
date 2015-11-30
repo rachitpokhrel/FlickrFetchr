@@ -4,9 +4,6 @@
 # use_frameworks!
 
 target 'FlickrFetcher' do
-       pod 'NXOAuth2Client', '~> 1.2.8'
-       pod 'AFNetworking'
        pod 'MBProgressHUD'
-       pod 'SVPullToRefresh'
 end
 

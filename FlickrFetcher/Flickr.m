@@ -88,7 +88,7 @@ NSString * const oauthAccessTokenDateKey = @"oauthAccessTokenDateKey";
 
 -(void)setVerifier:(NSString *)verifier{
     NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
-    [userDefaults setObject:_verifier forKey:oauthVerifierKey];
+    [userDefaults setObject:verifier forKey:oauthVerifierKey];
     [userDefaults synchronize];
 }
 
@@ -137,7 +137,6 @@ NSString * const oauthAccessTokenDateKey = @"oauthAccessTokenDateKey";
         
         [self _generateNonce];
         [self _generateTimestamp];
-        
         FlickrAccessTokenRequest *accessRequest = [[FlickrAccessTokenRequest alloc] init];
         accessRequest.oauthConsumerKey = consumerKey;
         accessRequest.oauthSecretKey = secretKey;
