@@ -27,7 +27,7 @@
 
 
 @interface NSString (OAURLEncodingAdditions)
-
++(NSString*)stringFromParameters:(NSDictionary*)parameters;
 - (NSString *)URLEncodedString;
 - (NSString *)URLDecodedString;
 

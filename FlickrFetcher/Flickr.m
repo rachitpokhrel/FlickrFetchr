@@ -7,10 +7,12 @@
 //
 
 #import "Flickr.h"
-#import "FlickrSignatureProvider.h"
-#import "NSString+URLEncoding.h"
 #import "AppDelegate.h"
-#import "Photo.h"
+#import "FlickrOAuthTokenRequest.h"
+#import "FlickrAccessTokenRequest.h"
+#import "FlickrInterestingPhotosRequest.h"
+#import "FlickrGetInfoForPhotoRequest.h"
+#import "FlickrFavoriteRequest.h"
 
 static NSString *consumerKey = @"ca0869ee37e969ec014805907785cfc0";
 static NSString *secretKey = @"062776ab5a5cad27";
@@ -21,21 +23,6 @@ NSString * const tokenURL = @"https://www.flickr.com/services/oauth/request_toke
 NSString * const callbackURL = @"iosflickr://";
 
 NSString * const restURL = @"https://api.flickr.com/services/rest";
-
-NSString * const oauthConsumerKey = @"oauth_consumer_key";
-NSString * const oauthCallback = @"oauth_callback";
-NSString * const oauthNonce = @"oauth_nonce";
-NSString * const oauthTimestamp = @"oauth_timestamp";
-NSString * const oauthSignatureMethod = @"oauth_signature_method";
-NSString * const oauthVersion = @"oauth_version";
-NSString * const accountType = @"flickr";
-
-NSString * const oauthSignature = @"oauth_signature";
-
-NSString * const oauthToken = @"oauth_token";
-NSString * const oauthTokenSecret = @"oauth_token_secret";
-
-NSString * const oauthVerifier = @"oauth_verifier";
 
 
 @interface Flickr()
@@ -48,10 +35,6 @@ NSString * const oauthVerifier = @"oauth_verifier";
 
 @property (nonatomic, strong) NSString *nonce;
 @property (nonatomic, strong) NSString *timestamp;
-
-@property (nonatomic, strong) NSString *fullname;
-@property (nonatomic, strong) NSString *userID;
-@property (nonatomic, strong) NSString *username;
 
 @end
 
@@ -66,123 +49,113 @@ NSString * const oauthVerifier = @"oauth_verifier";
     return flickr;
 }
 
+#pragma mark request token
+
 - (void)requestTokenWithCompletionHandler:(void(^)(NSString *authorizationURL,BOOL hasAccessToken, NSError *error))completionBlock
 {
     [self _generateNonce];
     [self _generateTimestamp];
-
-    NSDictionary *parameters = @{ @"oauth_consumer_key": consumerKey,
-                                  @"oauth_nonce": self.nonce,
-                                  @"oauth_signature_method": @"HMAC-SHA1",
-                                  @"oauth_timestamp": self.timestamp,
-                                  @"oauth_callback": callbackURL,
-                                  @"oauth_version": @"1.0"
-                                  };
-    
-    NSString *secret = [NSString stringWithFormat:@"%@&%@",secretKey,@""];
-    NSString *oauth_signature = [FlickrSignatureProvider signatureFromURL:tokenURL methog:@"GET" params:parameters secret:secret];
-    NSMutableDictionary *requestParameters = [parameters mutableCopy];
-    [requestParameters addEntriesFromDictionary:@{@"oauth_signature":oauth_signature}];
-    NSString *stringParameters = [self stringFromParameters:requestParameters];
-    NSString *url = [NSString stringWithFormat:@"%@?%@",tokenURL,stringParameters];
-    
-    NSOperationQueue *tokenQueue = [[NSOperationQueue alloc] init];
-    __block NSString *tokenResults;
-    [tokenQueue addOperationWithBlock:^{
-        NSError *error = nil;
-        tokenResults = [NSString stringWithContentsOfURL:[NSURL URLWithString:url] encoding:NSUTF8StringEncoding error:&error];
-        NSLog(@"tokenResults:%@",tokenResults);
-        __block NSMutableDictionary *resultDictionary = [NSMutableDictionary dictionary];
-        NSArray *resultArray = [tokenResults componentsSeparatedByString:@"&"];
-        [resultArray enumerateObjectsUsingBlock:^(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
-            NSArray *_ = [obj componentsSeparatedByString:@"="];
-            [resultDictionary addEntriesFromDictionary:@{_[0]:_[1]}];
-        }];
-        self.oauthToken = [resultDictionary valueForKey:@"oauth_token"];
-        self.oauthTokenSecret = [resultDictionary valueForKey:@"oauth_token_secret"];
-        NSLog(@"%@,%@",self.oauthToken,self.oauthTokenSecret);
-         NSString *authURL = [NSString stringWithFormat:@"%@?oauth_token=%@",authorizationURL,self.oauthToken];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            completionBlock(authURL,NO, error);
-        });
-        
+    FlickrOAuthTokenRequest *tokenRequest = [[FlickrOAuthTokenRequest alloc] init];
+    tokenRequest.oauthConsumerKey = consumerKey;
+    tokenRequest.oauthSecretKey = secretKey;
+    tokenRequest.oauthNonce = self.nonce;
+    tokenRequest.oauthTimestamp = self.timestamp;
+    tokenRequest.oauthCallBack = callbackURL;
+    [tokenRequest requestWithCompletionHandler:^(FlickrOAuthTokenResponse *response, NSError *error) {
+        self.oauthToken = response.oauthToken;
+        self.oauthTokenSecret = response.oauthTokenSecret;
+        NSString *authURL = [NSString stringWithFormat:@"%@?oauth_token=%@",authorizationURL,response.oauthToken];
+        completionBlock(authURL,NO, error);
     }];
     
-    //exchanging authToke for access Token
+    //exchanging oauthRequestToken for access Token
     ((AppDelegate*)([UIApplication sharedApplication].delegate)).verifierCompletionBlock = ^(NSString *query){
         
-        
-        __block NSMutableDictionary *verifierDictionary = [NSMutableDictionary dictionary];
+        __block NSMutableDictionary *verifier = [NSMutableDictionary dictionary];
         NSArray *verifierArray = [query componentsSeparatedByString:@"&"];
         [verifierArray enumerateObjectsUsingBlock:^(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
             NSArray *_ = [obj componentsSeparatedByString:@"="];
-            [verifierDictionary addEntriesFromDictionary:@{_[0]:_[1]}];
+            [verifier addEntriesFromDictionary:@{_[0]:_[1]}];
         }];
-        //self.oauthToken = [verifierDictionary valueForKey:@"oauth_token"];
-        self.verifier = [verifierDictionary valueForKey:@"oauth_verifier"];
+        
+        self.verifier = [verifier valueForKey:@"oauth_verifier"];
         
         [self _generateNonce];
         [self _generateTimestamp];
         
-        NSDictionary *parameters = @{ @"oauth_consumer_key": consumerKey,
-                                      @"oauth_nonce": self.nonce,
-                                      @"oauth_verifier":self.verifier,
-                                      @"oauth_token":self.oauthToken,
-                                      @"oauth_signature_method": @"HMAC-SHA1",
-                                      @"oauth_timestamp": self.timestamp,
-                                      @"oauth_version": @"1.0"
-                                      };
-        
-        NSString *secret = [NSString stringWithFormat:@"%@&%@",secretKey,self.oauthTokenSecret];
-        NSString *oauth_signature = [FlickrSignatureProvider signatureFromURL:accessTokenURL methog:@"GET" params:parameters secret:secret];
-        NSMutableDictionary *requestParameters = [parameters mutableCopy];
-        [requestParameters addEntriesFromDictionary:@{@"oauth_signature":oauth_signature}];
-        NSString *stringParameters = [self stringFromParameters:requestParameters];
-        NSString *url = [NSString stringWithFormat:@"%@?%@",accessTokenURL,stringParameters];
-        
-        NSOperationQueue *accessTokenQueue = [[NSOperationQueue alloc] init];
-        __block NSString *accessTokenResults;
-        [accessTokenQueue addOperationWithBlock:^{
-            NSError *accessTokenError = nil;
-            accessTokenResults = [NSString stringWithContentsOfURL:[NSURL URLWithString:url] encoding:NSUTF8StringEncoding error:&accessTokenError];
-            NSLog(@"accessTokenresults:%@",accessTokenResults);
-            __block NSMutableDictionary *accessTokenDictionary = [NSMutableDictionary dictionary];
-            NSArray *accessTokenArray = [accessTokenResults componentsSeparatedByString:@"&"];
-            [accessTokenArray enumerateObjectsUsingBlock:^(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
-                NSArray *_ = [obj componentsSeparatedByString:@"="];
-                [accessTokenDictionary addEntriesFromDictionary:@{_[0]:_[1]}];
-            }];
-            self.fullname = [accessTokenDictionary objectForKey:@"fullname"];
-            self.oauthAccessToken = [accessTokenDictionary objectForKey:@"oauth_token"];
-            self.oauthAccessTokenSecret = [accessTokenDictionary objectForKey:@"oauth_token_secret"];
-            self.userID = [accessTokenDictionary objectForKey:@"user_nsid"];
-            self.username = [accessTokenDictionary objectForKey:@"username"];
-            
-            dispatch_async(dispatch_get_main_queue(), ^{
-                completionBlock(nil, YES, accessTokenError);
-            });
-            
+        FlickrAccessTokenRequest *accessRequest = [[FlickrAccessTokenRequest alloc] init];
+        accessRequest.oauthConsumerKey = consumerKey;
+        accessRequest.oauthSecretKey = secretKey;
+        accessRequest.oauthToken = self.oauthToken;
+        accessRequest.oauthTokenSecret = self.oauthTokenSecret;
+        accessRequest.oauthNonce = self.nonce;
+        accessRequest.oauthTimestamp = self.timestamp;
+        accessRequest.oauthVerifier = self.verifier;
+        [accessRequest requestWithCompletionHandler:^(FlickrAccessTokenResponse *response, NSError *error) {
+            self.oauthAccessToken = response.accessToken;
+            self.oauthAccessTokenSecret = response.accessTokenSecret;
+            completionBlock(nil, YES, error);
         }];
-    
     };
 }
 
-
-
--(NSString*)stringFromParameters:(NSDictionary*)parameters{
-    NSString * _parameters;
-    NSArray *params = [NSArray array];
-    NSArray *keys = [parameters allKeys];
-    for (id key in keys)
-    {
-        params = [params arrayByAddingObject:[NSString stringWithFormat:@"%@=%@", [key URLEncodedString], [[parameters valueForKey:key] URLEncodedString]]];
-    }
+#pragma mark Interesting Photos
+-(void)requestInterestingPhotosWithPageNumber:(NSNumber*)pageNumber CompletionHandler:(void(^)(NSMutableArray *photos, NSError *error))completionBlock {
     
-    //sort paramaters lexicographically
-    params = [params sortedArrayUsingSelector:@selector(compare:)];
-    _parameters = [params componentsJoinedByString:@"&"];
-    return _parameters;
+    FlickrInterestingPhotosRequest *interestingRequest = [[FlickrInterestingPhotosRequest alloc] init];
+    interestingRequest.oauthConsumerKey = consumerKey;
+    interestingRequest.oauthSecretKey = secretKey;
+    interestingRequest.accessToken = self.oauthAccessToken;
+    interestingRequest.accessTokenSecret = self.oauthAccessTokenSecret;
+    interestingRequest.oauthNonce = self.nonce;
+    interestingRequest.oauthVerifier = self.verifier;
+    interestingRequest.oauthTimestamp = self.timestamp;
+    interestingRequest.url = restURL;
+    [interestingRequest requestWithPageNumber:pageNumber withCompletionHandler:^(NSMutableArray *photos, NSError *error) {
+        completionBlock(photos,error);
+    }];
 }
+
+-(void)requestInfoForPhoto:(NSString*)photoID secret:(NSString*)photoSecret completionHandler:(void (^)(BOOL isFavorite))completionBlock{
+    
+    FlickrGetInfoForPhotoRequest *infoRequest = [[FlickrGetInfoForPhotoRequest alloc] init];
+    infoRequest.oauthConsumerKey = consumerKey;
+    infoRequest.oauthSecretKey = secretKey;
+    infoRequest.accessToken = self.oauthAccessToken;
+    infoRequest.accessTokenSecret = self.oauthAccessTokenSecret;
+    infoRequest.oauthNonce = self.nonce;
+    infoRequest.oauthTimestamp = self.timestamp;
+    infoRequest.oauthVerifier = self.verifier;
+    infoRequest.url = restURL;
+    [infoRequest requestForPhoto:photoID secret:photoSecret withCompletionHandler:^(FlickrGetInfoForPhotoResponse *infoResponse, NSError *error) {
+        if ([infoResponse.isFavorite isEqual:@0])
+            completionBlock(YES);
+        else
+            completionBlock(NO);
+    }];
+}
+
+-(void)requestToFavorite:(BOOL)favorite Photo:(NSString *)photoID completionHandler:(void (^)(BOOL ok))completionBlock{
+    
+    FlickrFavoriteRequest *favoriteRequest = [[FlickrFavoriteRequest alloc] init];
+    favoriteRequest.oauthConsumerKey = consumerKey;
+    favoriteRequest.oauthSecretKey = secretKey;
+    favoriteRequest.accessToken = self.oauthAccessToken;
+    favoriteRequest.accessTokenSecret = self.oauthAccessTokenSecret;
+    favoriteRequest.oauthNonce = self.nonce;
+    favoriteRequest.oauthTimestamp = self.timestamp;
+    favoriteRequest.oauthVerifier = self.verifier;
+    favoriteRequest.url = restURL;
+    [favoriteRequest requestToFavorite:favorite photo:photoID withCompletionHandler:^(FlickrFavoriteResponse *response, NSError *error) {
+        if ([response.status isEqualToString:@"ok"])
+            completionBlock(YES);
+        else
+            completionBlock(NO);
+    }];
+}
+
+
+#pragma mark timestamp and nonce
 
 - (void)_generateTimestamp
 {
@@ -195,133 +168,6 @@ NSString * const oauthVerifier = @"oauth_verifier";
     CFStringRef string = CFUUIDCreateString(NULL, theUUID);
     
     self.nonce = (__bridge NSString *)string;
-}
-
-#pragma mark Interesting Photos
-
-
-
--(void)requestInterestingPhotosWithPageNumber:(NSNumber*)pageNumber CompletionHandler:(void(^)(NSMutableArray *photos, NSError *error))completionBlock {
-    
-    NSDictionary *parameters = @{ @"oauth_consumer_key": consumerKey,
-                                  @"oauth_nonce": self.nonce,
-                                  @"oauth_verifier":self.verifier,
-                                  @"oauth_token":self.oauthAccessToken,
-                                  @"oauth_signature_method": @"HMAC-SHA1",
-                                  @"oauth_timestamp": self.timestamp,
-                                  @"oauth_version": @"1.0",
-                                  @"nojsoncallback":@"1",
-                                  @"format":@"json",
-                                  @"page":[pageNumber stringValue],
-                                  @"method":@"flickr.interestingness.getList"
-                                  };
-    
-    NSString *secret = [NSString stringWithFormat:@"%@&%@",secretKey,self.oauthAccessTokenSecret];
-    NSString *oauth_signature = [FlickrSignatureProvider signatureFromURL:restURL methog:@"GET" params:parameters secret:secret];
-    NSMutableDictionary *requestParameters = [parameters mutableCopy];
-    [requestParameters addEntriesFromDictionary:@{@"oauth_signature":oauth_signature}];
-    NSString *stringParameters = [self stringFromParameters:requestParameters];
-    NSString *url = [NSString stringWithFormat:@"%@?%@",restURL,stringParameters];
-
-    NSURLSession *session = [NSURLSession sharedSession];
-    [[session dataTaskWithURL:[NSURL URLWithString:url] completionHandler:^(NSData *data,NSURLResponse *response, NSError *error) {
-        NSError *jsonError = nil;
-        id json = [NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingAllowFragments error:&jsonError];
-        //NSLog(@"json %@",json[@"photos"][@"photo"]);
-        NSArray *_ = json[@"photos"][@"photo"];
-        NSMutableArray *photos = [NSMutableArray array];
-        [_ enumerateObjectsUsingBlock:^(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
-            Photo *photo = [[Photo alloc] init];
-            photo.farm = [(NSDictionary*)obj objectForKey:@"farm"];
-            photo.ID = [(NSDictionary*)obj objectForKey:@"id"];
-            photo.owner = [(NSDictionary*)obj objectForKey:@"owner"];
-            photo.secret = [(NSDictionary*)obj objectForKey:@"secret"];
-            photo.title = [(NSDictionary*)obj objectForKey:@"title"];
-            photo.server = [(NSDictionary*)obj objectForKey:@"server"];
-            [photos addObject:photo];
-        }];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            completionBlock(photos,error);
-        });
-            }] resume];
-}
-
--(void)requestInfoForPhoto:(NSString*)photoID secret:(NSString*)photoSecret completionHandler:(void (^)(BOOL isFavorite))completionBlock{
-    NSDictionary *parameters = @{ @"oauth_consumer_key": consumerKey,
-                                  @"oauth_nonce": self.nonce,
-                                  @"oauth_verifier":self.verifier,
-                                  @"oauth_token":self.oauthAccessToken,
-                                  @"oauth_signature_method": @"HMAC-SHA1",
-                                  @"oauth_timestamp": self.timestamp,
-                                  @"oauth_version": @"1.0",
-                                  @"nojsoncallback":@"1",
-                                  @"format":@"json",
-                                  @"photo_id": photoID,
-                                  @"secret":photoSecret,
-                                  @"method":@"flickr.photos.getInfo"
-                                  };
-    
-    NSString *secret = [NSString stringWithFormat:@"%@&%@",secretKey,self.oauthAccessTokenSecret];
-    NSString *oauth_signature = [FlickrSignatureProvider signatureFromURL:restURL methog:@"GET" params:parameters secret:secret];
-    NSMutableDictionary *requestParameters = [parameters mutableCopy];
-    [requestParameters addEntriesFromDictionary:@{@"oauth_signature":oauth_signature}];
-    NSString *stringParameters = [self stringFromParameters:requestParameters];
-    NSString *url = [NSString stringWithFormat:@"%@?%@",restURL,stringParameters];
-    
-    NSURLSession *session = [NSURLSession sharedSession];
-    [[session dataTaskWithURL:[NSURL URLWithString:url] completionHandler:^(NSData *data,NSURLResponse *response, NSError *error) {
-        NSError *jsonError = nil;
-        id json = [NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingAllowFragments error:&jsonError];
-        //NSLog(@"json %@",json[@"photo"][@"isfavorite"]);
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if ([json[@"photo"][@"isfavorite"] isEqual:@0])
-                completionBlock(YES);
-            else
-                completionBlock(NO);
-        });
-        
-    }] resume];
-}
-
--(void)requestToFavorite:(BOOL)favorite Photo:(NSString *)photoID completionHandler:(void (^)(BOOL ok))completionBlock{
-    NSString *method;
-    if (favorite)
-        method = [NSString stringWithFormat:@"flickr.favorites.add"];
-    else
-        method = [NSString stringWithFormat:@"flickr.favorites.remove"];
-        
-    NSDictionary *parameters = @{ @"oauth_consumer_key": consumerKey,
-                                  @"oauth_nonce": self.nonce,
-                                  @"oauth_verifier":self.verifier,
-                                  @"oauth_token":self.oauthAccessToken,
-                                  @"oauth_signature_method": @"HMAC-SHA1",
-                                  @"oauth_timestamp": self.timestamp,
-                                  @"oauth_version": @"1.0",
-                                  @"nojsoncallback":@"1",
-                                  @"format":@"json",
-                                  @"photo_id": photoID,
-                                  @"method": method
-                                  };
-    
-    NSString *secret = [NSString stringWithFormat:@"%@&%@",secretKey,self.oauthAccessTokenSecret];
-    NSString *oauth_signature = [FlickrSignatureProvider signatureFromURL:restURL methog:@"POST" params:parameters secret:secret];
-    NSMutableDictionary *requestParameters = [parameters mutableCopy];
-    [requestParameters addEntriesFromDictionary:@{@"oauth_signature":oauth_signature}];
-    NSString *stringParameters = [self stringFromParameters:requestParameters];
-    NSString *url = [NSString stringWithFormat:@"%@?%@",restURL,stringParameters];
-    
-    NSOperationQueue *favoriteQueue = [[NSOperationQueue alloc] init];
-    [favoriteQueue addOperationWithBlock:^{
-        NSError *error = nil;
-        NSString *favoriteResult = [NSString stringWithContentsOfURL:[NSURL URLWithString:url] encoding:NSUTF8StringEncoding error:&error];
-        NSLog(@"favoritesresults:%@",favoriteResult);
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if ([favoriteResult containsString:@"ok"])
-                completionBlock(YES);
-            else
-                completionBlock(NO);
-        });
-    }];
 }
 
 @end

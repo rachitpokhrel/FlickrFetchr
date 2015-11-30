@@ -28,6 +28,21 @@
 
 @implementation NSString (OAURLEncodingAdditions)
 
++(NSString*)stringFromParameters:(NSDictionary*)parameters{
+    NSString * _parameters;
+    NSArray *params = [NSArray array];
+    NSArray *keys = [parameters allKeys];
+    for (id key in keys)
+    {
+        params = [params arrayByAddingObject:[NSString stringWithFormat:@"%@=%@", [key URLEncodedString], [[parameters valueForKey:key] URLEncodedString]]];
+    }
+    
+    //sort paramaters lexicographically
+    params = [params sortedArrayUsingSelector:@selector(compare:)];
+    _parameters = [params componentsJoinedByString:@"&"];
+    return _parameters;
+}
+
 - (NSString *)URLEncodedString 
 {
     NSString *result = (NSString *)CFBridgingRelease(CFURLCreateStringByAddingPercentEscapes(kCFAllocatorDefault,
