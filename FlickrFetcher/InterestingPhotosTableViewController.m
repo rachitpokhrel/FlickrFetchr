@@ -59,10 +59,20 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = @"Interesting Photos";
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(unwindToLogin:) name:OAuthAccessTokenExpiredNotification object:nil];
+    
     [self requestInterestingPhotos:self];
     self.refreshControl = [[UIRefreshControl alloc] init];
     [self.refreshControl addTarget:self action:@selector(requestInterestingPhotos:) forControlEvents:UIControlEventValueChanged];
+}
+
+-(void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(unwindToLogin:) name:OAuthAccessTokenExpiredNotification object:nil];
+}
+
+-(void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 -(void)requestInterestingPhotos:(id)sender{
