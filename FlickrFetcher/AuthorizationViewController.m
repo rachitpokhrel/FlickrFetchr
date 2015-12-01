@@ -25,12 +25,14 @@
             NSURLRequest* request = [NSURLRequest requestWithURL:url cachePolicy:NSURLRequestReloadIgnoringLocalAndRemoteCacheData timeoutInterval:30];
             [self.webView loadRequest:request];
         }else{
-            [self.webView stopLoading];
             [self performSegueWithIdentifier:@"interestingPhotosSegue" sender:self];
         }
         
     }];
-    
+}
+
+-(IBAction)loginUserForExpiredAccesToken:(UIStoryboardSegue*)sender{
+    [self viewDidLoad];
 }
 
 - (void)didReceiveMemoryWarning {

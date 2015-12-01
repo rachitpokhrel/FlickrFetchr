@@ -75,8 +75,12 @@
                         </connections>
                     </tableView>
                     <navigationItem key="navigationItem" id="WwR-sn-4JQ"/>
+                    <connections>
+                        <segue destination="ciT-Bf-Ts2" kind="unwind" identifier="loginUserForExpiredAccesTokenSegue" unwindAction="loginUserForExpiredAccesToken:" id="pQn-b6-r2r"/>
+                    </connections>
                 </tableViewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="mI0-3f-peN" userLabel="First Responder" sceneMemberID="firstResponder"/>
+                <exit id="ciT-Bf-Ts2" userLabel="Exit" sceneMemberID="exit"/>
             </objects>
             <point key="canvasLocation" x="2361" y="127"/>
         </scene>
@@ -123,9 +127,11 @@
                     <connections>
                         <outlet property="favorite" destination="Fc3-TJ-mvS" id="x6h-is-Vxw"/>
                         <outlet property="imageView" destination="V3i-QF-0q3" id="Qgl-Rt-7FO"/>
+                        <segue destination="Qja-9G-Bz4" kind="unwind" identifier="loginUserForExpiredAccesTokenSegue" unwindAction="loginUserForExpiredAccesToken:" id="4Qp-el-gUf"/>
                     </connections>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="ddh-78-Egt" userLabel="First Responder" sceneMemberID="firstResponder"/>
+                <exit id="Qja-9G-Bz4" userLabel="Exit" sceneMemberID="exit"/>
             </objects>
             <point key="canvasLocation" x="3099" y="127"/>
         </scene>

@@ -7,7 +7,7 @@
 //
 
 #import <Foundation/Foundation.h>
-
+extern NSString * const OAuthAccessTokenExpiredNotification;
 @interface Flickr : NSObject
 
 +(Flickr*)sharedFlickr;

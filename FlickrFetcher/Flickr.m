@@ -29,6 +29,8 @@ NSString * const oauthAccesTokenSecretKey = @"oauthAccessTokenSecretKey";
 NSString * const oauthVerifierKey = @"oauthVerifierKey";
 NSString * const oauthAccessTokenDateKey = @"oauthAccessTokenDateKey";
 
+NSString * const OAuthAccessTokenExpiredNotification = @"oauthAccessTokenExpiredNotification";
+
 
 @interface Flickr()
 @property (nonatomic, strong) NSString *oauthToken;
@@ -37,9 +39,12 @@ NSString * const oauthAccessTokenDateKey = @"oauthAccessTokenDateKey";
 
 @property (nonatomic, strong) NSString *oauthAccessToken;
 @property (nonatomic, strong) NSString *oauthAccessTokenSecret;
+@property (nonatomic, assign) BOOL oauthAccessTokenExpired;
 
 @property (nonatomic, strong) NSString *nonce;
 @property (nonatomic, strong) NSString *timestamp;
+
+@property (nonatomic, strong) NSUserDefaults *defaults;
 
 @end
 
@@ -60,42 +65,59 @@ NSString * const oauthAccessTokenDateKey = @"oauthAccessTokenDateKey";
 
 
 #pragma mark getters/setters
+
+-(NSUserDefaults *)defaults{
+    if (!_defaults){
+        _defaults = [NSUserDefaults standardUserDefaults];
+    }
+    return _defaults;
+}
+
+-(BOOL)oauthAccessTokenExpired{
+    NSDate *date = [self.defaults objectForKey:oauthAccessTokenDateKey];
+    if (date){
+        int seconds = -(int)[date timeIntervalSinceNow];
+        int hours = seconds/3600;
+        if (hours > 24){
+            [self.defaults removeObjectForKey:oauthAccessTokenKey];
+            [self.defaults removeObjectForKey:oauthAccessTokenDateKey];
+            [self.defaults removeObjectForKey:oauthAccesTokenSecretKey];
+            [self.defaults removeObjectForKey:oauthVerifierKey];
+            [[NSNotificationCenter defaultCenter] postNotificationName:OAuthAccessTokenExpiredNotification object:nil];
+            return YES;
+        }
+        else
+            return NO;
+    }else
+        return NO;
+    
+}
+
 -(void)setOauthAccessToken:(NSString *)oauthAccessToken{
-    NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
-    [userDefaults setObject:oauthAccessToken forKey:oauthAccessTokenKey];
-    [userDefaults synchronize];
+    [self.defaults setObject:[NSDate date] forKey:oauthAccessTokenDateKey];
+    [self.defaults setObject:oauthAccessToken forKey:oauthAccessTokenKey];
 }
 
 -(NSString *)oauthAccessToken{
-    NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
-    _oauthAccessToken = [userDefaults objectForKey:oauthAccessTokenKey];
-    [userDefaults synchronize];
+    _oauthAccessToken = [self.defaults objectForKey:oauthAccessTokenKey];
     return _oauthAccessToken;
 }
 
 -(void)setOauthAccessTokenSecret:(NSString *)oauthAccessTokenSecret{
-    NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
-    [userDefaults setObject:oauthAccessTokenSecret forKey:oauthAccesTokenSecretKey];
-    [userDefaults synchronize];
+    [self.defaults setObject:oauthAccessTokenSecret forKey:oauthAccesTokenSecretKey];
 }
 
 -(NSString *)oauthAccessTokenSecret{
-    NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
-    _oauthAccessTokenSecret = [userDefaults objectForKey:oauthAccesTokenSecretKey];
-    [userDefaults synchronize];
+    _oauthAccessTokenSecret = [self.defaults objectForKey:oauthAccesTokenSecretKey];
     return _oauthAccessTokenSecret;
 }
 
 -(void)setVerifier:(NSString *)verifier{
-    NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
-    [userDefaults setObject:verifier forKey:oauthVerifierKey];
-    [userDefaults synchronize];
+    [self.defaults setObject:verifier forKey:oauthVerifierKey];
 }
 
 -(NSString *)verifier{
-    NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
-    _verifier = [userDefaults objectForKey:oauthVerifierKey];
-    [userDefaults synchronize];
+    _verifier = [self.defaults objectForKey:oauthVerifierKey];
     return _verifier;
 }
 
@@ -126,14 +148,14 @@ NSString * const oauthAccessTokenDateKey = @"oauthAccessTokenDateKey";
     //exchanging oauthRequestToken for access Token
     ((AppDelegate*)([UIApplication sharedApplication].delegate)).verifierCompletionBlock = ^(NSString *query){
         
-        __block NSMutableDictionary *verifier = [NSMutableDictionary dictionary];
+        __block NSMutableDictionary *verifierResponse = [NSMutableDictionary dictionary];
         NSArray *verifierArray = [query componentsSeparatedByString:@"&"];
         [verifierArray enumerateObjectsUsingBlock:^(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
             NSArray *_ = [obj componentsSeparatedByString:@"="];
-            [verifier addEntriesFromDictionary:@{_[0]:_[1]}];
+            [verifierResponse addEntriesFromDictionary:@{_[0]:_[1]}];
         }];
         
-        self.verifier = [verifier valueForKey:@"oauth_verifier"];
+        self.verifier = [verifierResponse valueForKey:@"oauth_verifier"];
         
         [self _generateNonce];
         [self _generateTimestamp];
@@ -155,6 +177,7 @@ NSString * const oauthAccessTokenDateKey = @"oauthAccessTokenDateKey";
 
 #pragma mark Interesting Photos
 -(void)requestInterestingPhotosWithPageNumber:(NSNumber*)pageNumber CompletionHandler:(void(^)(NSMutableArray *photos, NSError *error))completionBlock {
+    if (self.oauthAccessTokenExpired) return;
     [self _generateNonce];
     [self _generateTimestamp];
     FlickrInterestingPhotosRequest *interestingRequest = [[FlickrInterestingPhotosRequest alloc] init];
@@ -172,6 +195,7 @@ NSString * const oauthAccessTokenDateKey = @"oauthAccessTokenDateKey";
 }
 
 -(void)requestInfoForPhoto:(NSString*)photoID secret:(NSString*)photoSecret completionHandler:(void (^)(BOOL isFavorite))completionBlock{
+    if (self.oauthAccessTokenExpired) return;
     [self _generateNonce];
     [self _generateTimestamp];
     FlickrGetInfoForPhotoRequest *infoRequest = [[FlickrGetInfoForPhotoRequest alloc] init];
@@ -192,6 +216,7 @@ NSString * const oauthAccessTokenDateKey = @"oauthAccessTokenDateKey";
 }
 
 -(void)requestToFavorite:(BOOL)favorite Photo:(NSString *)photoID completionHandler:(void (^)(BOOL ok))completionBlock{
+    if (self.oauthAccessTokenExpired) return;
     [self _generateNonce];
     [self _generateTimestamp];
     FlickrFavoriteRequest *favoriteRequest = [[FlickrFavoriteRequest alloc] init];

@@ -59,6 +59,7 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = @"Interesting Photos";
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(unwindToLogin:) name:OAuthAccessTokenExpiredNotification object:nil];
     [self requestInterestingPhotos:self];
     self.refreshControl = [[UIRefreshControl alloc] init];
     [self.refreshControl addTarget:self action:@selector(requestInterestingPhotos:) forControlEvents:UIControlEventValueChanged];
@@ -90,6 +91,11 @@
     [self reloadData];
     self.pagingRequestSent = NO;
     [MBProgressHUD hideHUDForView:self.view animated:YES];
+}
+
+-(void)unwindToLogin:(NSNotification*)notification
+{
+    [self performSegueWithIdentifier:@"loginUserForExpiredAccesTokenSegue" sender:self];
 }
 
 - (void)didReceiveMemoryWarning {

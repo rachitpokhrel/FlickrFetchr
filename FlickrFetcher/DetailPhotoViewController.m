@@ -20,8 +20,8 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    // Do any additional setup after loading the view.
     self.navigationController.title = self.title;
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(unwindToLogin:) name:OAuthAccessTokenExpiredNotification object:nil];
     NSOperationQueue *queue = [[NSOperationQueue alloc] init];
     [MBProgressHUD showHUDAddedTo:self.view animated:YES];
     [queue addOperationWithBlock:^{
@@ -62,6 +62,11 @@
         }];
     }
     
+}
+
+-(void)unwindToLogin:(NSNotification*)notification
+{
+    [self performSegueWithIdentifier:@"loginUserForExpiredAccesTokenSegue" sender:self];
 }
 
 - (void)didReceiveMemoryWarning {
