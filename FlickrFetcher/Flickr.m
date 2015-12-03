@@ -194,7 +194,7 @@ NSString * const OAuthAccessTokenExpiredNotification = @"oauthAccessTokenExpired
     }];
 }
 
--(void)requestInfoForPhoto:(NSString*)photoID secret:(NSString*)photoSecret completionHandler:(void (^)(BOOL isFavorite))completionBlock{
+-(void)requestInfoForPhoto:(NSString*)photoID secret:(NSString*)photoSecret completionHandler:(void (^)(BOOL isFavorite, NSError *error))completionBlock{
     if (self.oauthAccessTokenExpired) return;
     [self _generateNonce];
     [self _generateTimestamp];
@@ -209,13 +209,13 @@ NSString * const OAuthAccessTokenExpiredNotification = @"oauthAccessTokenExpired
     infoRequest.url = restURL;
     [infoRequest requestForPhoto:photoID secret:photoSecret withCompletionHandler:^(FlickrGetInfoForPhotoResponse *infoResponse, NSError *error) {
         if ([infoResponse.isFavorite isEqual:@0])
-            completionBlock(YES);
+            completionBlock(YES, error);
         else
-            completionBlock(NO);
+            completionBlock(NO, error);
     }];
 }
 
--(void)requestToFavorite:(BOOL)favorite Photo:(NSString *)photoID completionHandler:(void (^)(BOOL ok))completionBlock{
+-(void)requestToFavorite:(BOOL)favorite Photo:(NSString *)photoID completionHandler:(void (^)(BOOL ok, NSError *error))completionBlock{
     if (self.oauthAccessTokenExpired) return;
     [self _generateNonce];
     [self _generateTimestamp];
@@ -230,9 +230,9 @@ NSString * const OAuthAccessTokenExpiredNotification = @"oauthAccessTokenExpired
     favoriteRequest.url = restURL;
     [favoriteRequest requestToFavorite:favorite photo:photoID withCompletionHandler:^(FlickrFavoriteResponse *response, NSError *error) {
         if ([response.status isEqualToString:@"ok"])
-            completionBlock(YES);
+            completionBlock(YES, error);
         else
-            completionBlock(NO);
+            completionBlock(NO, error);
     }];
 }
 

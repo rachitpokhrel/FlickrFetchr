@@ -51,7 +51,7 @@
     if (!_downloadQueue) {
         _downloadQueue = [[NSOperationQueue alloc] init];
         _downloadQueue.name = @"Download Queue";
-        _downloadQueue.maxConcurrentOperationCount = 1;
+        _downloadQueue.maxConcurrentOperationCount = 4;
     }
     return _downloadQueue;
 }
@@ -76,26 +76,36 @@
 }
 
 -(void)requestInterestingPhotos:(id)sender{
-    if ([sender isKindOfClass:[UIRefreshControl class]]){
+    if ([sender isKindOfClass:[UIRefreshControl class]])
         self.pageNumber = @1;
-        [self requestInterestingPhotosForPageNumber:self.pageNumber sender:sender];
-    }else
-        [self requestInterestingPhotosForPageNumber:self.pageNumber sender:sender];
+    [self requestInterestingPhotosForPageNumber:self.pageNumber sender:sender];
 }
 
 -(void)requestInterestingPhotosForPageNumber:(NSNumber*)pageNumber sender:(id)sender{
     [MBProgressHUD showHUDAddedTo:self.view animated:YES];
     NSLog(@"pagenumber:%@",pageNumber);
     [[Flickr sharedFlickr] requestInterestingPhotosWithPageNumber:pageNumber CompletionHandler:^(NSMutableArray *photos, NSError *error) {
-        [self updatePhotos:photos sender:sender];
+        
+        if (error){
+            UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"Error" message:error.localizedDescription preferredStyle:UIAlertControllerStyleAlert];
+            UIAlertAction* cancelAction = [UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleDestructive handler:^(UIAlertAction * action) {}];
+            UIAlertAction* reloadAction = [UIAlertAction actionWithTitle:@"Try Again" style:UIAlertActionStyleDefault handler:^(UIAlertAction * action) {
+                [MBProgressHUD hideHUDForView:self.view animated:YES];
+                [self requestInterestingPhotosForPageNumber:pageNumber sender:self];
+            }];
+            [alert addAction:reloadAction];
+            [alert addAction:cancelAction];
+            [self presentViewController:alert animated:YES completion:nil];
+        }else{
+            [self updatePhotos:photos sender:sender];
+        }
     }];
 }
 
 -(void)updatePhotos:(NSMutableArray*)photos sender:(id)sender{
-    if ([sender isKindOfClass:[UIRefreshControl class]]){
+    if ([sender isKindOfClass:[UIRefreshControl class]])
         if (photos)
             [self.photos removeAllObjects];
-    }
     [self.photos addObjectsFromArray:photos];
     NSLog(@"photos:%@",self.photos);
     [self reloadData];

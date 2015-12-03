@@ -8,6 +8,6 @@
 
 #import <UIKit/UIKit.h>
 
-@interface AuthorizationViewController : UIViewController
+@interface AuthorizationViewController : UIViewController<UIWebViewDelegate>
 
 @end

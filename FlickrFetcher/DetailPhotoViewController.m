@@ -30,38 +30,73 @@
         dispatch_async(dispatch_get_main_queue(), ^{
             UIImage *image = [UIImage imageWithData:data];
             self.imageView.image = image;
-            [[Flickr sharedFlickr] requestInfoForPhoto:self.photoID secret:self.secret completionHandler:^(BOOL isFavorite) {
-                if (isFavorite)
-                    self.favorite.title = @"Favorite";
-                else
-                    self.favorite.title = @"Remove Favorite";
-                [MBProgressHUD hideAllHUDsForView:self.view animated:YES];
-            }];
+            [self requestInfoForPhoto:self.photoID secret:self.secret];
         });
     }];
 }
+
+-(void)requestInfoForPhoto:(NSString*)photoID secret:(NSString*)secret
+{
+    [[Flickr sharedFlickr] requestInfoForPhoto:photoID secret:secret completionHandler:^(BOOL isFavorite, NSError *error) {
+        if (error){
+            [MBProgressHUD hideHUDForView:self.view animated:YES];
+            UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"Error" message:error.localizedDescription preferredStyle:UIAlertControllerStyleAlert];
+            UIAlertAction* cancelAction = [UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleDestructive handler:^(UIAlertAction * action) {}];
+            UIAlertAction* reloadAction = [UIAlertAction actionWithTitle:@"Try Again" style:UIAlertActionStyleDefault handler:^(UIAlertAction * action) {
+                [self requestInfoForPhoto:photoID secret:secret];
+                [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+            }];
+            [alert addAction:reloadAction];
+            [alert addAction:cancelAction];
+            [self presentViewController:alert animated:YES completion:nil];
+        }else{
+            if (isFavorite)
+                self.favorite.title = @"Favorite";
+            else
+                self.favorite.title = @"Remove Favorite";
+            [MBProgressHUD hideHUDForView:self.view animated:YES];
+        }
+    }];
+}
+
 - (IBAction)makeFavorite:(UIBarButtonItem *)sender {
 
     if ([sender.title isEqualToString:@"Favorite"]){
         MBProgressHUD *hud = [MBProgressHUD showHUDAddedTo:self.view animated:YES];
         hud.mode = MBProgressHUDModeAnnularDeterminate;
         hud.labelText = @"Adding Favorite";
-        [[Flickr sharedFlickr] requestToFavorite:YES Photo:self.photoID completionHandler:^(BOOL ok) {
-            if (ok)
-                sender.title = @"Remove Favorite";
-            [hud hide:YES];
-        }];
+        [self requestTofavorite:YES photo:self.photoID hud:hud buttonTitle:@"Remove Favorite" sender:sender];
     }else{
         MBProgressHUD *hud = [MBProgressHUD showHUDAddedTo:self.view animated:YES];
         hud.mode = MBProgressHUDModeAnnularDeterminate;
         hud.labelText = @"Removing Favorite";
-        [[Flickr sharedFlickr] requestToFavorite:NO Photo:self.photoID completionHandler:^(BOOL ok) {
-            if (ok)
-                sender.title = @"Favorite";
-            [hud hide:YES];
-        }];
+        [self requestTofavorite:NO photo:self.photoID hud:hud buttonTitle:@"Favorite" sender:sender];
     }
     
+}
+
+-(void)requestTofavorite:(BOOL)favorite photo:(NSString*)photoID hud:(MBProgressHUD*)hud buttonTitle:(NSString*)title sender:(UIBarButtonItem *)sender
+{
+    [[Flickr sharedFlickr] requestToFavorite:favorite Photo:photoID completionHandler:^(BOOL ok, NSError *error) {
+        
+        if (error){
+            [hud hide:YES];
+            UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"Error" message:error.localizedDescription preferredStyle:UIAlertControllerStyleAlert];
+            UIAlertAction* cancelAction = [UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleDestructive handler:^(UIAlertAction * action) {}];
+            UIAlertAction* reloadAction = [UIAlertAction actionWithTitle:@"Try Again" style:UIAlertActionStyleDefault handler:^(UIAlertAction * action) {
+                [self requestTofavorite:favorite photo:photoID hud:hud buttonTitle:title sender:sender];
+                [hud show:YES];
+            }];
+            [alert addAction:reloadAction];
+            [alert addAction:cancelAction];
+            [self presentViewController:alert animated:YES completion:nil];
+        }else{
+            if (ok)
+                sender.title = title;
+            [hud hide:YES];
+        }
+        
+    }];
 }
 
 -(void)unwindToLogin:(NSNotification*)notification

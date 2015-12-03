@@ -5,5 +5,6 @@
 
 target 'FlickrFetcher' do
        pod 'MBProgressHUD'
+       pod 'Reachability'
 end
 
